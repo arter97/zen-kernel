@@ -3,6 +3,8 @@
  * Copyright (C) 2013--2024 Intel Corporation
  */
 
+#include <asm/cpu_device_id.h>
+
 #include <linux/bitfield.h>
 #include <linux/bits.h>
 #include <linux/dma-mapping.h>
@@ -489,8 +491,9 @@ static int ipu6_pci_config_setup(struct pci_dev *dev, u8 hw_ver)
 	int ret;
 
 	/* disable IPU6 PCI ATS on mtl ES2 */
-	if (is_ipu6ep_mtl(hw_ver) && boot_cpu_data.x86_stepping == 0x2 &&
-	    pci_ats_supported(dev))
+	if ((boot_cpu_data.x86_vfm == INTEL_METEORLAKE ||
+	     boot_cpu_data.x86_vfm == INTEL_METEORLAKE_L) &&
+	    boot_cpu_data.x86_stepping == 0x2 && pci_ats_supported(dev))
 		pci_disable_ats(dev);
 
 	/* No PCI msi capability for IPU6EP */
