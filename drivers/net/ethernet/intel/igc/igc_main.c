@@ -3190,6 +3190,7 @@ done:
 		tx_desc->read.buffer_addr = cpu_to_le64(dma);
 
 		bi->type = IGC_TX_BUFFER_TYPE_XSK;
+		bi->tx_flags |= IGC_TX_FLAGS_DMA_TSTAMP;
 		bi->protocol = 0;
 		bi->bytecount = xdp_desc.len;
 		bi->gso_segs = 1;
@@ -3229,6 +3230,7 @@ static bool igc_clean_tx_irq(struct igc_q_vector *q_vector, int napi_budget)
 	unsigned int i = tx_ring->next_to_clean;
 	struct igc_tx_buffer *tx_buffer;
 	union igc_adv_tx_desc *tx_desc;
+	ktime_t timestamp = 0;
 	u32 xsk_frames = 0;
 
 	if (test_bit(__IGC_DOWN, &adapter->state))
@@ -3262,7 +3264,10 @@ static bool igc_clean_tx_irq(struct igc_q_vector *q_vector, int napi_budget)
 		    tx_buffer->tx_flags & IGC_TX_FLAGS_DMA_TSTAMP) {
 			u64 tstamp = le64_to_cpu(eop_desc->wb.dma_tstamp);
 
-			igc_ptp_tx_dma_tstamp(adapter, tx_buffer->skb, tstamp);
+			if (tx_ring->xsk_pool && adapter->tstamp_config.tx_type == HWTSTAMP_TX_ON)
+				timestamp = igc_tx_dma_hw_tstamp(adapter, tstamp);
+			else
+				igc_ptp_tx_dma_tstamp(adapter, tx_buffer->skb, tstamp);
 		}
 
 		/* clear next_to_watch to prevent false hangs */
@@ -3274,6 +3279,11 @@ static bool igc_clean_tx_irq(struct igc_q_vector *q_vector, int napi_budget)
 
 		switch (tx_buffer->type) {
 		case IGC_TX_BUFFER_TYPE_XSK:
+#if defined(CONFIG_TRACING)
+		/* Only use for RTCP KPI Measurement on Q2 */
+		if (tx_ring->queue_index == 2 && adapter->tstamp_config.tx_type == HWTSTAMP_TX_ON)
+			trace_printk("TX HW TS %lld\n", timestamp);
+#endif
 			xsk_frames++;
 			break;
 		case IGC_TX_BUFFER_TYPE_XDP:
