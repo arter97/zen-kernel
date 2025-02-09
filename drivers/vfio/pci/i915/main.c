@@ -395,3 +395,4 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Intel Corporation");
 MODULE_DESCRIPTION("VFIO PCI driver with migration support for Intel Graphics");
 MODULE_IMPORT_NS(DRM_I915);
+MODULE_IMPORT_NS(I915_SRIOV_NS);
